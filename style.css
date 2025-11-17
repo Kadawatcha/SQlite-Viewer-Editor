@@ -211,6 +211,23 @@ button:disabled:hover {
     gap: 0.5rem;
 }
 
+.table-button-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.delete-icon {
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: background-color var(--transition-speed) ease;
+}
+
+.delete-icon:hover {
+    background-color: #e9ecef;
+}
+
 .table-button {
     width: 100%;
     padding: 0.75rem;
