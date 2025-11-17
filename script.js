@@ -184,6 +184,10 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
 
             tables[0].values.forEach(tableNameArr => {
                 const tableName = tableNameArr[0];
+
+                const container = document.createElement('div');
+                container.className = 'table-button-item';
+
                 const button = document.createElement('button');
                 button.className = 'table-button';
                 button.textContent = tableName;
@@ -195,11 +199,61 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                     button.classList.add('active');
                     currentActiveButton = button;
                 };
-                tableListContainer.appendChild(button);
+
+                const deleteIcon = document.createElement('span');
+                deleteIcon.className = 'delete-icon';
+                deleteIcon.textContent = '🗑️';
+                deleteIcon.onclick = (e) => {
+                    e.stopPropagation(); // Empêche le clic de déclencher le bouton de la table
+                    deleteTable(tableName);
+                };
+
+                container.appendChild(button);
+                container.appendChild(deleteIcon);
+                tableListContainer.appendChild(container);
             });
         } catch (error) {
             console.error("Error listing tables:", error);
             alert(translations[currentLang]['list_tables_error']);
+        }
+    }
+
+    function deleteTable(tableName) {
+        const confirmText = getTranslation('delete_table_confirm', { tableName });
+        if (!confirm(confirmText)) {
+            return;
+        }
+
+        try {
+            db.run(`DROP TABLE \`${tableName}\``);
+            const successText = getTranslation('delete_table_success', { tableName });
+            showToast(successText);
+
+            // Marquer la base de données comme modifiée
+            if (!isDbModified) {
+                isDbModified = true;
+                saveDbButton.disabled = false;
+            }
+            saveDbToIndexedDB(db.export(), fileNameSpan.textContent); // Mettre à jour IndexedDB
+
+            // Si la table supprimée était celle affichée, on nettoie la vue
+            if (currentActiveButton && currentActiveButton.textContent === tableName) {
+                tableDataContainer.innerHTML = `<p data-i18n-key="select_table_prompt">${translations[currentLang]['select_table_prompt']}</p>`;
+                exportControlsDiv.style.display = 'none';
+                currentActiveButton = null;
+                 // Vider également les contrôles de pagination
+                const paginationControls = document.getElementById('paginationControls');
+                if (paginationControls) {
+                    paginationControls.innerHTML = '';
+                }
+            }
+
+            displayTables(); // Rafraîchir la liste des tables
+
+        } catch (error) {
+            console.error(`Error deleting table ${tableName}:`, error);
+            const errorText = getTranslation('delete_table_error', { tableName });
+            showToast(errorText, 'error');
         }
     }
 
