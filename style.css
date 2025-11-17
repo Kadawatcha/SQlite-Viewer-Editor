@@ -209,6 +209,8 @@ button:disabled:hover {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    overflow-y: auto;
+    max-height: 300px; /* Ou une autre hauteur que vous préférez */
 }
 
 .table-button-item {
