@@ -641,14 +641,14 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     }
 
     function exportToCSV(tableName, columns, data) {
-        let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += columns.map(escapeCSV).join(',') + '\r\n';
+        let csvContent = columns.map(escapeCSV).join(',') + '\r\n';
 
         data.forEach(row => {
             csvContent += row.map(escapeCSV).join(',') + '\r\n';
         });
 
-        downloadFile(new Blob([csvContent], { type: "text/csv;charset=utf-8" }), `${tableName}.csv`);
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+        downloadFile(blob, `${tableName}.csv`);
     }
 
     function exportToJSON(tableName, columns, data) {
@@ -681,7 +681,9 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         const worksheet = XLSX.utils.json_to_sheet(dataAsObjects);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, tableName);
-        downloadFile(XLSX.write(workbook, { type: 'blob', bookType: 'xlsx' }), `${tableName}.xlsx`);
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], {type: 'application/octet-stream'});
+        downloadFile(blob, `${tableName}.xlsx`);
     }
 
     function updateCell(tableName, colName, newValue, pkeyName, pkeyValue) {
