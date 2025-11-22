@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                             td.textContent = '[BLOB]';
                         }
                     } else {
-                        const textValue = value === null ? 'NULL' : String(value);
+                        let textValue = value === null ? 'NULL' : String(value);
                         if (isURL(textValue)) {
                             const linkWrapper = document.createElement('div');
                             const a = document.createElement('a');
@@ -400,7 +400,16 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                             } else {
                                 newValue = e.target.textContent;
                             }
-                            updateCell(tableName, colName, newValue, pkeyColumnName, pkeyValue);
+                            // Trim for text content to avoid issues with non-breaking spaces or newlines
+                            // introduced by contentEditable
+                            if (newValue !== textValue) {
+                                updateCell(tableName, colName, newValue, pkeyColumnName, pkeyValue);
+                                // Update the textValue in the closure to reflect the new value for subsequent edits
+                                textValue = newValue;
+                            } else {
+                                // If no change, just re-render to clean up any formatting issues (like newlines from contentEditable)
+                                td.textContent = textValue;
+                            }
                         });
                     }
                     tr.appendChild(td);
