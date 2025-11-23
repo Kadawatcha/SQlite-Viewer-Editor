@@ -1,5 +1,6 @@
 /* Modernized CSS for SQLite Viewer / Editor */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&family=Orbitron:wght@400..900&display=swap');
+
 :root {
     --primary-color: #007bff;
     --primary-hover-color: #0056b3;
@@ -14,6 +15,17 @@
     --transition-speed: 0.2s;
 }
 
+body[data-theme="dark"] {
+    --primary-color: #0d6efd;
+    --primary-hover-color: #3d8bfd;
+    --background-color: #121212;
+    --text-color: #e0e0e0;
+    --header-color: #ffffff;
+    --container-bg-color: #1e1e1e;
+    --border-color: #444444;
+    --shadow-color: rgba(255, 255, 255, 0.05);
+}
+
 
 
 body {
@@ -24,6 +36,7 @@ body {
     color: var(--text-color);
     overflow-x: hidden; /* Empêche le défilement horizontal de la page principale */
     line-height: 1.6;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
 }
 
 .main-container {
@@ -70,6 +83,42 @@ h1 {
     color: white;
     border-color: var(--primary-color);
 }
+
+/* --- Theme Switcher --- */
+.theme-switcher {
+    position: absolute;
+    top: 0;
+    left: 1rem; /* Un peu d'espace depuis le bord */
+    display: flex;
+    align-items: center;
+}
+
+#theme-toggle-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+    color: var(--text-color); /* Pour que l'emoji hérite de la couleur */
+}
+
+#theme-toggle-btn:hover {
+    background-color: var(--border-color);
+}
+
+/* Gérer l'affichage des icônes */
+body[data-theme="dark"] #theme-toggle-btn .icon-sun { display: inline; }
+body[data-theme="dark"] #theme-toggle-btn .icon-moon { display: none; }
+body[data-theme="light"] #theme-toggle-btn .icon-sun { display: none; }
+body[data-theme="light"] #theme-toggle-btn .icon-moon { display: inline; }
+
 
 .controls-container {
     display: flex;
@@ -183,7 +232,7 @@ button:disabled:hover {
 #exportFormat {
     padding: 0.5rem;
     border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);    
+    border: 1px solid var(--border-color);
     background-color: white;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     /* Modern appearance */
@@ -195,6 +244,12 @@ button:disabled:hover {
     background-position: right 0.5rem center;
     background-size: 1em;
     padding-right: 2rem; /* Make space for the arrow */
+}
+
+body[data-theme="dark"] #exportFormat {
+    background-color: var(--container-bg-color);
+    color: var(--text-color);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e0e0e0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
 }
 
 #exportBtn {
@@ -268,14 +323,21 @@ th, td {
 }
 
 th {
-    background-color: #f2f2f2;
+    background-color: #e9ecef;
     font-weight: 700;
     position: sticky;
     top: 0;
 }
 
+body[data-theme="dark"] th {
+    background-color: #2c2c2c;
+}
+
 tbody tr:nth-child(even) {
     background-color: #f8f9fa;
+}
+body[data-theme="dark"] tbody tr:nth-child(even) {
+    background-color: #2a2a2a;
 }
 
 tbody tr:hover {
@@ -288,10 +350,18 @@ td[contenteditable="true"] {
     transition: background-color var(--transition-speed) ease;
 }
 
+body[data-theme="dark"] td[contenteditable="true"] {
+    background-color: #4d3c00;
+}
+
 td[contenteditable="true"]:focus {
     background-color: #ffeeba;
     outline: 2px solid var(--primary-color);
     outline-offset: -2px;
+}
+
+body[data-theme="dark"] td[contenteditable="true"]:focus {
+    background-color: #665100;
 }
 
 /* Style pour la colonne de la clé primaire */
@@ -299,6 +369,9 @@ td[contenteditable="true"]:focus {
     background-color: #f0f0f0 !important; /* Fond gris pour la distinguer */
     font-style: italic;
     cursor: not-allowed; /* Curseur pour indiquer qu'elle n'est pas cliquable */
+}
+body[data-theme="dark"] .pk-column {
+    background-color: #333 !important;
 }
 
 td img {
@@ -358,4 +431,8 @@ footer p {
 #toast-notification.warning {
     background-color: #ffc107; /* Jaune */
     color: #212529;
+}
+
+body[data-theme="dark"] #toast-notification.warning {
+    color: #212529; /* Le texte reste sombre pour une meilleure lisibilité sur fond jaune */
 }

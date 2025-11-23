@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     const exportControlsDiv = document.getElementById('exportControls');
     const saveDbButton = document.getElementById('saveDb');
     const fileNameSpan = document.getElementById('fileName');
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
     let db;
     let currentActiveButton = null;
@@ -152,6 +153,15 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     }
 
     // --- End I18n ---
+
+    // --- Theme Management ---
+
+    function loadTheme() {
+        const preferredTheme = localStorage.getItem('theme') || 'light';
+        setTheme(preferredTheme);
+    }
+
+    // --- End Theme Management ---
 
     const config = {
         locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${filename}`
@@ -748,6 +758,21 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         return translation;
     }
 
+    // --- Theme Management Logic ---
+    function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.body.getAttribute('data-theme');
+        if (currentTheme === 'dark') {
+            setTheme('light');
+        } else {
+            setTheme('dark');
+        }
+    });
+
     // --- Initialisation ---
 
     async function start() {
@@ -755,6 +780,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         const userLang = navigator.language.split('-')[0]; // 'fr-FR' -> 'fr'
         const initialLang = translations[userLang] ? userLang : 'en'; // 'en' par défaut
         setLanguage(initialLang);
+
+        loadTheme(); // Charger le thème au démarrage
 
         await initIndexedDB();
         const storedDb = await loadDbFromIndexedDB();
