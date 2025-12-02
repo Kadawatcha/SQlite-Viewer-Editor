@@ -308,6 +308,11 @@ body[data-theme="dark"] #exportFormat {
     overflow-x: auto;
 }
 
+#tableData .table-responsive {
+    overflow-y: auto;
+    height: 65vh; /* Hauteur fixe pour éviter que les boutons de pagination ne sautent */
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
