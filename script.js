@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     const saveDbButton = document.getElementById('saveDb');
     const fileNameSpan = document.getElementById('fileName');
     const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const tableFilterInput = document.getElementById('tableFilter');
+    const dataFilterInput = document.getElementById('dataFilter');
 
     let db;
     let currentActiveButton = null;
@@ -15,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     const pagination = {
         rowsPerPage: 10,
         currentPage: 1,
-        tableName: null
+        tableName: null,
+        currentFilter: ''
     };
 
     let currentLang = 'fr';
@@ -116,6 +119,16 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                 }
             }
         });
+
+        // Handle placeholders
+        const placeholderElements = document.querySelectorAll('[data-i18n-placeholder]');
+        placeholderElements.forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            let translation = translations[currentLang][key];
+            if (translation) {
+                el.placeholder = translation;
+            }
+        });
     }
 
     function setLanguage(lang) {
@@ -180,10 +193,33 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         await initializeAppWithDb(new Uint8Array(fileBuffer), file.name);
     });
 
+    // Table list filtering
+    tableFilterInput.addEventListener('input', (e) => {
+        const filterValue = e.target.value.toLowerCase();
+        const buttons = tableListContainer.querySelectorAll('.table-button-item');
+        buttons.forEach(btnContainer => {
+            const btn = btnContainer.querySelector('.table-button');
+            if (btn.textContent.toLowerCase().includes(filterValue)) {
+                btnContainer.style.display = '';
+            } else {
+                btnContainer.style.display = 'none';
+            }
+        });
+    });
+
+    // Data filtering
+    dataFilterInput.addEventListener('input', (e) => {
+        if (currentActiveButton) {
+            // Reset to page 1 when filtering
+            displayTableData(currentActiveButton.textContent, 1, e.target.value);
+        }
+    });
+
     function displayTables() {
         tableListContainer.innerHTML = '';
         tableDataContainer.innerHTML = `<p data-i18n-key="select_table_prompt">${translations[currentLang]['select_table_prompt']}</p>`;
         exportControlsDiv.style.display = 'none'; // Cacher les contrôles d'export
+        dataFilterInput.style.display = 'none'; // Cacher le filtre de données
 
         try {
             const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
@@ -205,7 +241,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                     if (currentActiveButton) {
                         currentActiveButton.classList.remove('active');
                     }
-                    displayTableData(tableName);
+                    dataFilterInput.value = ''; // Reset filter input
+                    displayTableData(tableName, 1, ''); // Reset filter state
                     button.classList.add('active');
                     currentActiveButton = button;
                 };
@@ -313,9 +350,14 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         container.appendChild(previewContainer);
     }
 
-    function displayTableData(tableName, page = 1) {
+    function displayTableData(tableName, page = 1, filter = null) {
         pagination.tableName = tableName;
         pagination.currentPage = page;
+        if (filter !== null) {
+            pagination.currentFilter = filter;
+        }
+
+        dataFilterInput.style.display = 'block'; // Ensure filter input is visible
 
         const headerText = translations[currentLang]['table_content_header'].replace('{tableName}', tableName);
         const tableHeader = document.querySelector('#tableData .table-header-controls h2');
@@ -331,12 +373,33 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             }
             const pkeyColumnName = pkeyColumn ? pkeyColumn[1] : null;
 
+            // Prepare Queries with Filter
+            let query = `SELECT * FROM \`${tableName}\``;
+            let countQuery = `SELECT COUNT(*) FROM \`${tableName}\``;
+
+            if (pagination.currentFilter) {
+                const colInfo = db.exec(`PRAGMA table_info(\`${tableName}\`)`);
+                if (colInfo.length > 0) {
+                    const columns = colInfo[0].values.map(c => c[1]);
+                    // Using simple string concatenation for WHERE clause with LIKE.
+                    // Note: sql.js binding for multiple OR LIKE clauses dynamically is tricky.
+                    // Ideally we should bind parameters, but for generic search across all columns:
+                    const filterValue = pagination.currentFilter.replace(/'/g, "''"); // Basic SQL escape
+                    const whereClause = columns.map(col => `\`${col}\` LIKE '%${filterValue}%'`).join(' OR ');
+                    query += ` WHERE ${whereClause}`;
+                    countQuery += ` WHERE ${whereClause}`;
+                }
+            }
+
             // Pagination: Count total rows
-            const countResult = db.exec(`SELECT COUNT(*) FROM \`${tableName}\`;`);
+            const countResult = db.exec(countQuery);
             const totalRows = countResult[0].values[0][0];
             const totalPages = Math.ceil(totalRows / pagination.rowsPerPage);
             const offset = (page - 1) * pagination.rowsPerPage;
-            const stmt = db.prepare(`SELECT * FROM \`${tableName}\` LIMIT ${pagination.rowsPerPage} OFFSET ${offset}`);
+
+            query += ` LIMIT ${pagination.rowsPerPage} OFFSET ${offset}`;
+
+            const stmt = db.prepare(query);
             const table = document.createElement('table');
             const thead = document.createElement('thead');
             const tbody = document.createElement('tbody');
@@ -466,13 +529,13 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
 
         document.getElementById('prevPage').addEventListener('click', () => {
             if (pagination.currentPage > 1) {
-                displayTableData(pagination.tableName, pagination.currentPage - 1);
+                displayTableData(pagination.tableName, pagination.currentPage - 1, null); // Keep current filter
             }
         });
 
         document.getElementById('nextPage').addEventListener('click', () => {
             if (pagination.currentPage < totalPages) {
-                displayTableData(pagination.tableName, pagination.currentPage + 1);
+                displayTableData(pagination.tableName, pagination.currentPage + 1, null); // Keep current filter
             }
         });
     }
