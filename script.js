@@ -18,8 +18,12 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         rowsPerPage: 10,
         currentPage: 1,
         tableName: null,
-        currentFilter: ''
+        currentFilter: '',
+        sortColumn: null,
+        sortOrder: 'ASC'
     };
+
+    const tableStates = {};
 
     let currentLang = 'fr';
 
@@ -211,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     dataFilterInput.addEventListener('input', (e) => {
         if (currentActiveButton) {
             // Reset to page 1 when filtering
-            displayTableData(currentActiveButton.textContent, 1, e.target.value);
+            displayTableData(currentActiveButton.textContent, 1, e.target.value, pagination.sortColumn, pagination.sortOrder);
         }
     });
 
@@ -241,8 +245,16 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                     if (currentActiveButton) {
                         currentActiveButton.classList.remove('active');
                     }
-                    dataFilterInput.value = ''; // Reset filter input
-                    displayTableData(tableName, 1, ''); // Reset filter state
+
+                    const savedState = tableStates[tableName];
+                    if (savedState) {
+                        dataFilterInput.value = savedState.filter;
+                        displayTableData(tableName, savedState.page, savedState.filter, savedState.sortColumn, savedState.sortOrder);
+                    } else {
+                        dataFilterInput.value = ''; // Reset filter input
+                        displayTableData(tableName, 1, '', null, 'ASC'); // Reset filter state
+                    }
+
                     button.classList.add('active');
                     currentActiveButton = button;
                 };
@@ -350,12 +362,61 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         container.appendChild(previewContainer);
     }
 
-    function displayTableData(tableName, page = 1, filter = null) {
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function highlightText(text, filter) {
+        if (!filter || text === null || text === undefined) return escapeHtml(text);
+        const strText = String(text);
+        const lowerText = strText.toLowerCase();
+        const lowerFilter = filter.toLowerCase();
+
+        if (!lowerText.includes(lowerFilter)) return escapeHtml(strText);
+
+        const parts = [];
+        let i = 0;
+        let matchIndex = lowerText.indexOf(lowerFilter, i);
+
+        while (matchIndex !== -1) {
+            parts.push({ isMatch: false, text: strText.substring(i, matchIndex) });
+            parts.push({ isMatch: true, text: strText.substring(matchIndex, matchIndex + filter.length) });
+            i = matchIndex + filter.length;
+            matchIndex = lowerText.indexOf(lowerFilter, i);
+        }
+        parts.push({ isMatch: false, text: strText.substring(i) });
+
+        return parts.map(part => {
+            if (part.isMatch) {
+                return `<span class="highlight">${escapeHtml(part.text)}</span>`;
+            } else {
+                return escapeHtml(part.text);
+            }
+        }).join('');
+    }
+
+    function displayTableData(tableName, page = 1, filter = null, sortColumn = null, sortOrder = 'ASC') {
         pagination.tableName = tableName;
         pagination.currentPage = page;
         if (filter !== null) {
             pagination.currentFilter = filter;
         }
+        pagination.sortColumn = sortColumn;
+        pagination.sortOrder = sortOrder;
+
+        // Save state
+        tableStates[tableName] = {
+            page: pagination.currentPage,
+            filter: pagination.currentFilter,
+            sortColumn: pagination.sortColumn,
+            sortOrder: pagination.sortOrder
+        };
 
         dataFilterInput.style.display = 'block'; // Ensure filter input is visible
 
@@ -363,6 +424,24 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         const tableHeader = document.querySelector('#tableData .table-header-controls h2');
         tableHeader.innerHTML = headerText;
         tableDataContainer.innerHTML = ''; // Vider seulement la zone du tableau
+
+        const renderCellContent = (cell, val) => {
+            cell.innerHTML = '';
+            const strVal = val === null ? 'NULL' : String(val);
+            if (isURL(strVal)) {
+                const linkWrapper = document.createElement('div');
+                const a = document.createElement('a');
+                a.href = strVal;
+                a.innerHTML = highlightText(strVal, pagination.currentFilter);
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                linkWrapper.appendChild(a);
+                cell.appendChild(linkWrapper);
+                generateLinkPreview(strVal, linkWrapper);
+            } else {
+                cell.innerHTML = highlightText(strVal, pagination.currentFilter);
+            }
+        };
     
         try {
             const pkeyInfo = db.exec(`PRAGMA table_info(${tableName})`);
@@ -391,6 +470,10 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                 }
             }
 
+            if (pagination.sortColumn) {
+                query += ` ORDER BY \`${pagination.sortColumn}\` ${pagination.sortOrder}`;
+            }
+
             // Pagination: Count total rows
             const countResult = db.exec(countQuery);
             const totalRows = countResult[0].values[0][0];
@@ -407,11 +490,31 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             const headerRow = document.createElement('tr');
             stmt.getColumnNames().forEach(colName => {
                 const th = document.createElement('th');
-                th.textContent = colName;
+                th.style.cursor = 'pointer';
+                th.onclick = () => {
+                    let newOrder = 'ASC';
+                    if (pagination.sortColumn === colName && pagination.sortOrder === 'ASC') {
+                        newOrder = 'DESC';
+                    }
+                    displayTableData(tableName, 1, null, colName, newOrder);
+                };
+
+                const spanName = document.createElement('span');
+                spanName.textContent = colName;
+                th.appendChild(spanName);
+
+                if (pagination.sortColumn === colName) {
+                    const spanArrow = document.createElement('span');
+                    spanArrow.textContent = pagination.sortOrder === 'ASC' ? ' ▲' : ' ▼';
+                    th.appendChild(spanArrow);
+                }
+
                 if (colName === pkeyColumnName) {
                     th.classList.add('pk-column');
                     th.title = getTranslation('pk_column_tooltip');
-                    th.innerHTML += ' 🔑'; // Ajoute une icône de clé
+                    const spanKey = document.createElement('span');
+                    spanKey.textContent = ' 🔑';
+                    th.appendChild(spanKey);
                 }
                 headerRow.appendChild(th);
             });
@@ -430,6 +533,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                         td.classList.add('pk-column');
                     }
 
+                    let textValue = null;
+
                     if (value instanceof Uint8Array) {
                         try {
                             const blob = new Blob([value], { type: 'image/png' });
@@ -441,20 +546,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                             td.textContent = '[BLOB]';
                         }
                     } else {
-                        let textValue = value === null ? 'NULL' : String(value);
-                        if (isURL(textValue)) {
-                            const linkWrapper = document.createElement('div');
-                            const a = document.createElement('a');
-                            a.href = textValue;
-                            a.textContent = textValue;
-                            a.target = '_blank';
-                            a.rel = 'noopener noreferrer';
-                            linkWrapper.appendChild(a);
-                            td.appendChild(linkWrapper);
-                            generateLinkPreview(textValue, linkWrapper);
-                        } else {
-                            td.textContent = textValue;
-                        }
+                        textValue = value === null ? 'NULL' : String(value);
+                        renderCellContent(td, textValue);
                     }
 
                     if (pkeyColumnName && colName !== pkeyColumnName) {
@@ -465,23 +558,24 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                                 e.target.blur();
                             }
                         });
-                        td.addEventListener('blur', (e) => {
-                            // Si la cellule contient un lien, la valeur est dans le div > a
-                            let newValue;
-                            if (e.target.querySelector('a')) {
-                                newValue = e.target.querySelector('a').textContent;
-                            } else {
-                                newValue = e.target.textContent;
+
+                        td.addEventListener('focus', () => {
+                            if (textValue !== null) {
+                                td.textContent = textValue;
                             }
-                            // Trim for text content to avoid issues with non-breaking spaces or newlines
-                            // introduced by contentEditable
+                        });
+
+                        td.addEventListener('blur', (e) => {
+                            if (textValue === null) return; // Skip for BLOBs
+
+                            const newValue = e.target.textContent;
+
                             if (newValue !== textValue) {
                                 updateCell(tableName, colName, newValue, pkeyColumnName, pkeyValue);
-                                // Update the textValue in the closure to reflect the new value for subsequent edits
                                 textValue = newValue;
+                                renderCellContent(td, textValue);
                             } else {
-                                // If no change, just re-render to clean up any formatting issues (like newlines from contentEditable)
-                                td.textContent = textValue;
+                                renderCellContent(td, textValue);
                             }
                         });
                     }
@@ -529,13 +623,13 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
 
         document.getElementById('prevPage').addEventListener('click', () => {
             if (pagination.currentPage > 1) {
-                displayTableData(pagination.tableName, pagination.currentPage - 1, null); // Keep current filter
+                displayTableData(pagination.tableName, pagination.currentPage - 1, null, pagination.sortColumn, pagination.sortOrder); // Keep current filter
             }
         });
 
         document.getElementById('nextPage').addEventListener('click', () => {
             if (pagination.currentPage < totalPages) {
-                displayTableData(pagination.tableName, pagination.currentPage + 1, null); // Keep current filter
+                displayTableData(pagination.tableName, pagination.currentPage + 1, null, pagination.sortColumn, pagination.sortOrder); // Keep current filter
             }
         });
     }
@@ -783,7 +877,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             }
         } catch (error) {
             showToast(getTranslation('update_error'), 'error');
-            displayTableData(tableName);
+            displayTableData(tableName, pagination.currentPage, pagination.currentFilter, pagination.sortColumn, pagination.sortOrder);
         }
     }
 
