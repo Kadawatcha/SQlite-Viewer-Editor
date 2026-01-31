@@ -484,3 +484,15 @@ body[data-theme="dark"] #toast-notification.warning {
     min-width: 200px;
     margin-bottom: 0;
 }
+
+/* --- Search Highlighting --- */
+.highlight {
+    background-color: yellow;
+    color: black;
+    border-radius: 2px;
+}
+
+body[data-theme="dark"] .highlight {
+    background-color: #ffca28; /* Amber */
+    color: black;
+}
