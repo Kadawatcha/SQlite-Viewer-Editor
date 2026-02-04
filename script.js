@@ -18,9 +18,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         rowsPerPage: 10,
         currentPage: 1,
         tableName: null,
-        currentFilter: '',
-        sortColumn: null,
-        sortOrder: 'ASC'
+        currentFilter: ''
     };
 
     const tableStates = {};
@@ -215,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
     dataFilterInput.addEventListener('input', (e) => {
         if (currentActiveButton) {
             // Reset to page 1 when filtering
-            displayTableData(currentActiveButton.textContent, 1, e.target.value, pagination.sortColumn, pagination.sortOrder);
+            displayTableData(currentActiveButton.textContent, 1, e.target.value);
         }
     });
 
@@ -249,10 +247,10 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                     const savedState = tableStates[tableName];
                     if (savedState) {
                         dataFilterInput.value = savedState.filter;
-                        displayTableData(tableName, savedState.page, savedState.filter, savedState.sortColumn, savedState.sortOrder);
+                        displayTableData(tableName, savedState.page, savedState.filter);
                     } else {
                         dataFilterInput.value = ''; // Reset filter input
-                        displayTableData(tableName, 1, '', null, 'ASC'); // Reset filter state
+                        displayTableData(tableName, 1, ''); // Reset filter state
                     }
 
                     button.classList.add('active');
@@ -401,21 +399,17 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         }).join('');
     }
 
-    function displayTableData(tableName, page = 1, filter = null, sortColumn = null, sortOrder = 'ASC') {
+    function displayTableData(tableName, page = 1, filter = null) {
         pagination.tableName = tableName;
         pagination.currentPage = page;
         if (filter !== null) {
             pagination.currentFilter = filter;
         }
-        pagination.sortColumn = sortColumn;
-        pagination.sortOrder = sortOrder;
 
         // Save state
         tableStates[tableName] = {
             page: pagination.currentPage,
-            filter: pagination.currentFilter,
-            sortColumn: pagination.sortColumn,
-            sortOrder: pagination.sortOrder
+            filter: pagination.currentFilter
         };
 
         dataFilterInput.style.display = 'block'; // Ensure filter input is visible
@@ -470,10 +464,6 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                 }
             }
 
-            if (pagination.sortColumn) {
-                query += ` ORDER BY \`${pagination.sortColumn}\` ${pagination.sortOrder}`;
-            }
-
             // Pagination: Count total rows
             const countResult = db.exec(countQuery);
             const totalRows = countResult[0].values[0][0];
@@ -490,24 +480,10 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             const headerRow = document.createElement('tr');
             stmt.getColumnNames().forEach(colName => {
                 const th = document.createElement('th');
-                th.style.cursor = 'pointer';
-                th.onclick = () => {
-                    let newOrder = 'ASC';
-                    if (pagination.sortColumn === colName && pagination.sortOrder === 'ASC') {
-                        newOrder = 'DESC';
-                    }
-                    displayTableData(tableName, 1, null, colName, newOrder);
-                };
 
                 const spanName = document.createElement('span');
                 spanName.textContent = colName;
                 th.appendChild(spanName);
-
-                if (pagination.sortColumn === colName) {
-                    const spanArrow = document.createElement('span');
-                    spanArrow.textContent = pagination.sortOrder === 'ASC' ? ' ▲' : ' ▼';
-                    th.appendChild(spanArrow);
-                }
 
                 if (colName === pkeyColumnName) {
                     th.classList.add('pk-column');
@@ -623,13 +599,13 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
 
         document.getElementById('prevPage').addEventListener('click', () => {
             if (pagination.currentPage > 1) {
-                displayTableData(pagination.tableName, pagination.currentPage - 1, null, pagination.sortColumn, pagination.sortOrder); // Keep current filter
+                displayTableData(pagination.tableName, pagination.currentPage - 1, null); // Keep current filter
             }
         });
 
         document.getElementById('nextPage').addEventListener('click', () => {
             if (pagination.currentPage < totalPages) {
-                displayTableData(pagination.tableName, pagination.currentPage + 1, null, pagination.sortColumn, pagination.sortOrder); // Keep current filter
+                displayTableData(pagination.tableName, pagination.currentPage + 1, null); // Keep current filter
             }
         });
     }
@@ -877,7 +853,7 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             }
         } catch (error) {
             showToast(getTranslation('update_error'), 'error');
-            displayTableData(tableName, pagination.currentPage, pagination.currentFilter, pagination.sortColumn, pagination.sortOrder);
+            displayTableData(tableName, pagination.currentPage, pagination.currentFilter);
         }
     }
 
