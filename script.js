@@ -18,8 +18,11 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         rowsPerPage: 10,
         currentPage: 1,
         tableName: null,
-        currentFilter: ''
+        currentFilter: '',
+        columnFilters: {}
     };
+
+    let focusedColumn = null;
 
     const tableStates = {};
 
@@ -247,9 +250,11 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                     const savedState = tableStates[tableName];
                     if (savedState) {
                         dataFilterInput.value = savedState.filter;
+                        pagination.columnFilters = savedState.columnFilters || {};
                         displayTableData(tableName, savedState.page, savedState.filter);
                     } else {
                         dataFilterInput.value = ''; // Reset filter input
+                        pagination.columnFilters = {};
                         displayTableData(tableName, 1, ''); // Reset filter state
                     }
 
@@ -409,7 +414,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
         // Save state
         tableStates[tableName] = {
             page: pagination.currentPage,
-            filter: pagination.currentFilter
+            filter: pagination.currentFilter,
+            columnFilters: {...pagination.columnFilters}
         };
 
         dataFilterInput.style.display = 'block'; // Ensure filter input is visible
@@ -450,6 +456,8 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             let query = `SELECT * FROM \`${tableName}\``;
             let countQuery = `SELECT COUNT(*) FROM \`${tableName}\``;
 
+            let whereClauses = [];
+
             if (pagination.currentFilter) {
                 const colInfo = db.exec(`PRAGMA table_info(\`${tableName}\`)`);
                 if (colInfo.length > 0) {
@@ -458,10 +466,24 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                     // Note: sql.js binding for multiple OR LIKE clauses dynamically is tricky.
                     // Ideally we should bind parameters, but for generic search across all columns:
                     const filterValue = pagination.currentFilter.replace(/'/g, "''"); // Basic SQL escape
-                    const whereClause = columns.map(col => `\`${col}\` LIKE '%${filterValue}%'`).join(' OR ');
-                    query += ` WHERE ${whereClause}`;
-                    countQuery += ` WHERE ${whereClause}`;
+                    const globalWhere = columns.map(col => `\`${col}\` LIKE '%${filterValue}%'`).join(' OR ');
+                    whereClauses.push(`(${globalWhere})`);
                 }
+            }
+
+            // Column filters
+            Object.keys(pagination.columnFilters).forEach(col => {
+                const val = pagination.columnFilters[col];
+                if (val) {
+                     const safeVal = val.replace(/'/g, "''");
+                     whereClauses.push(`\`${col}\` LIKE '%${safeVal}%'`);
+                }
+            });
+
+            if (whereClauses.length > 0) {
+                const whereStr = whereClauses.join(' AND ');
+                query += ` WHERE ${whereStr}`;
+                countQuery += ` WHERE ${whereStr}`;
             }
 
             // Pagination: Count total rows
@@ -484,6 +506,26 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
                 const spanName = document.createElement('span');
                 spanName.textContent = colName;
                 th.appendChild(spanName);
+
+                // Add Filter Input
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'column-filter';
+                input.placeholder = '🔍';
+                input.dataset.column = colName;
+                if (pagination.columnFilters[colName]) {
+                    input.value = pagination.columnFilters[colName];
+                }
+
+                input.addEventListener('input', (e) => {
+                    pagination.columnFilters[colName] = e.target.value;
+                    focusedColumn = colName; // Track focus
+                    displayTableData(tableName, 1); // Reset to page 1
+                });
+
+                input.addEventListener('click', (e) => e.stopPropagation());
+
+                th.appendChild(input);
 
                 if (colName === pkeyColumnName) {
                     th.classList.add('pk-column');
@@ -565,6 +607,16 @@ document.addEventListener('DOMContentLoaded', () => { // Main function wrapper
             table.appendChild(tbody);
             tableDataContainer.appendChild(table);
             renderPaginationControls(totalRows, totalPages);
+
+            // Restore focus
+            if (focusedColumn) {
+                const inputToFocus = document.querySelector(`.column-filter[data-column="${focusedColumn}"]`);
+                if (inputToFocus) {
+                    inputToFocus.focus();
+                    const val = inputToFocus.value;
+                    inputToFocus.setSelectionRange(val.length, val.length);
+                }
+            }
 
             // Afficher et configurer les contrôles d'exportation
             setupExportControls(tableName);
